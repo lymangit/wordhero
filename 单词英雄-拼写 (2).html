@@ -1,0 +1,1378 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>單詞記憶闖關遊戲</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    
+    <!-- 配置Tailwind自定義樣式 -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#4F46E5',
+                        secondary: '#10B981',
+                        danger: '#EF4444',
+                        accent: '#F59E0B',
+                        light: '#F3F4F6',
+                    },
+                    fontFamily: {
+                        kids: ['"Comic Sans MS"', '"Marker Felt"', 'Arial', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto { content-visibility: auto; }
+            .bounce-subtle { animation: bounce-subtle 0.5s ease-in-out; }
+            .float { animation: float 3s ease-in-out infinite; }
+            .scale-hover { transition: transform 0.2s; }
+            .scale-hover:hover { transform: scale(1.05); }
+            .pronunciation-btn.active { background-color: #4F46E5; color: white; }
+            .pulse-light { animation: pulse-light 2s infinite; }
+            .flash { animation: flash 0.5s ease-in-out 3; border: 2px solid #EF4444; }
+            .correct-highlight { animation: correct 1s ease-in-out; background-color: rgba(16, 185, 129, 0.2); }
+            .wrong-highlight { animation: wrong 1s ease-in-out; background-color: rgba(239, 68, 68, 0.2); }
+            .like-animation { animation: like-pop 1.5s ease-out forwards; }
+            .guide-step { border-left: 3px solid #4F46E5; padding-left: 1rem; margin: 0.5rem 0; }
+            .letter-box { 
+                width: 1.8rem; 
+                height: 1.8rem; 
+                display: inline-flex; 
+                align-items: center; 
+                justify-content: center; 
+                border-bottom: 2px solid #4F46E5;
+                margin: 0 0.3rem;
+                font-weight: bold;
+                font-size: 1.2rem;
+            }
+            .letter-input {
+                width: 1.8rem;
+                height: 1.8rem;
+                text-align: center;
+                border: none;
+                border-bottom: 2px solid #4F46E5;
+                margin: 0 0.3rem;
+                font-weight: bold;
+                font-size: 1.2rem;
+                text-transform: none !important;
+            }
+            .letter-input:focus {
+                outline: none;
+                border-bottom: 2px solid #10B981;
+            }
+        }
+        
+        @keyframes bounce-subtle {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-15px); }
+        }
+        
+        @keyframes pulse-light {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        
+        @keyframes flash {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.7; transform: scale(1.1); }
+        }
+        
+        @keyframes correct {
+            0%, 100% { background-color: transparent; }
+            50% { background-color: rgba(16, 185, 129, 0.3); }
+        }
+        
+        @keyframes wrong {
+            0%, 100% { background-color: transparent; }
+            50% { background-color: rgba(239, 68, 68, 0.3); }
+        }
+        
+        @keyframes like-pop {
+            0% { transform: scale(0); opacity: 0; }
+            50% { transform: scale(1.2); opacity: 1; }
+            70% { transform: scale(1); opacity: 1; }
+            100% { transform: scale(1); opacity: 0; }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-purple-50 min-h-screen font-kids text-gray-800 overflow-x-hidden">
+    <!-- 正確點讚圖標 -->
+    <div id="like-icon" class="fixed inset-0 flex items-center justify-center opacity-0 pointer-events-none z-30">
+        <i class="fa fa-thumbs-up text-secondary text-[20rem]"></i>
+    </div>
+
+    <div class="container mx-auto px-4 py-8 max-w-5xl">
+        <!-- 遊戲標題 -->
+        <header class="text-center mb-8">
+            <h1 class="text-[clamp(2rem,5vw,3.5rem)] font-bold text-primary mb-2 float">
+                <i class="fa fa-book"></i> 單詞小英雄
+            </h1>
+            <p class="text-gray-600 text-xl">10個關卡自由選擇，成為單詞小專家！</p>
+        </header>
+        
+        <!-- 關卡和進度信息 -->
+        <div class="flex justify-between items-center mb-6 bg-white rounded-xl shadow-md p-5 flex-wrap gap-2">
+            <div><span class="text-gray-500">當前關卡：</span><span id="current-level" class="text-primary font-bold text-2xl">1/10</span></div>
+            <div><span class="text-gray-500">當前進度：</span><span id="current-progress" class="text-accent font-bold text-2xl">0/70</span></div>
+            <button id="select-level-btn" class="bg-primary/10 text-primary px-5 py-3 rounded-full scale-hover text-lg">
+                <i class="fa fa-th"></i> 選擇關卡
+            </button>
+        </div>
+        
+        <!-- 詞庫選擇界面 -->
+        <div id="library-selection" class="text-center py-20 bg-white rounded-xl shadow-md mb-6">
+            <h2 class="text-3xl font-bold text-primary mb-6">選擇詞庫</h2>
+            <p class="mb-8 text-gray-600 text-xl">請選擇從本地文件加載詞庫（JSON格式）</p>
+            
+            <div class="mb-8">
+                <label for="file-upload" class="bg-primary text-white px-8 py-4 rounded-full inline-block cursor-pointer scale-hover mb-3 text-lg">
+                    <i class="fa fa-upload"></i> 選擇本地詞庫文件
+                </label>
+                <input id="file-upload" type="file" accept=".json" class="hidden" />
+                <p id="file-name" class="text-base text-gray-500">未選擇文件（請選擇擴展名為.json的文件）</p>
+            </div>
+            
+            <button id="load-local-btn" class="bg-secondary text-white px-8 py-4 rounded-full scale-hover disabled:opacity-50 disabled:cursor-not-allowed text-lg" disabled>
+                <i class="fa fa-play"></i> 開始遊戲
+            </button>
+        </div>
+        
+        <!-- 加載狀態 -->
+        <div id="loading" class="hidden text-center py-20 bg-white rounded-xl shadow-md">
+            <i class="fa fa-spinner fa-spin text-primary text-5xl mb-6 pulse-light"></i>
+            <p class="text-2xl">正在加載詞庫，請稍候...</p>
+            <div class="mt-8 w-3/4 mx-auto bg-gray-200 rounded-full h-3">
+                <div id="progress-bar" class="bg-primary h-3 rounded-full w-0 transition-all duration-300"></div>
+            </div>
+        </div>
+        
+        <!-- 錯誤狀態 -->
+        <div id="error" class="hidden text-center py-20 bg-white rounded-xl shadow-md">
+            <i class="fa fa-exclamation-triangle text-danger text-5xl mb-6"></i>
+            <p id="error-message" class="text-2xl text-danger mb-6">詞庫加載失敗</p>
+            <p id="error-details" class="mb-6 text-gray-600 max-w-2xl mx-auto whitespace-pre-line text-lg"></p>
+            <div id="json-tips" class="hidden bg-yellow-50 border-l-4 border-yellow-400 p-5 mb-8 text-left text-base text-yellow-700">
+                <p class="font-bold mb-2"><i class="fa fa-lightbulb-o"></i> 解決提示：</p>
+                <ul class="list-disc pl-5 space-y-2">
+                    <li>檢查JSON文件是否完整，沒有被截斷</li>
+                    <li>確保所有括號和引號都已正確閉合</li>
+                    <li>驗證JSON格式可使用在線工具如jsonlint.com</li>
+                    <li>嘗試重新下載或創建詞庫文件</li>
+                </ul>
+            </div>
+            <!-- 语音包缺失提示 -->
+            <div id="voice-tips" class="hidden bg-blue-50 border-l-4 border-blue-400 p-5 mb-8 text-left text-base text-blue-700">
+                <p class="font-bold mb-3 text-lg"><i class="fa fa-volume-down"></i> 语音包缺失提示：</p>
+                <p class="mb-2">您的浏览器缺少必要的语音包，可能无法正常朗读。请按照以下步骤安装：</p>
+                <div class="guide-step">
+                    <p class="font-semibold">Chrome浏览器（电脑版）：</p>
+                    <ol class="list-decimal pl-5 space-y-1 mt-1">
+                        <li>打开Chrome，在地址栏输入 <code class="bg-gray-100 px-1 py-0.5 rounded">chrome://settings/accessibility</code></li>
+                        <li>找到「文字转语音」选项，点击「添加语音」</li>
+                        <li>安装所需语音包：
+                            <ul class="list-disc pl-5 mt-1">
+                                <li>英文：选择「English (United States)」或「English (United Kingdom)」</li>
+                                <li>普通话：选择「Chinese (Mainland)」或「Chinese (Mandarin)」</li>
+                                <li>粤语：选择「Chinese (Hong Kong)」</li>
+                            </ul>
+                        </li>
+                        <li>安装完成后，刷新本页面即可生效</li>
+                    </ol>
+                </div>
+                <div class="guide-step">
+                    <p class="font-semibold">Chrome浏览器（手机版）：</p>
+                    <ol class="list-decimal pl-5 space-y-1 mt-1">
+                        <li>打开手机「设置」→「辅助功能」→「文字转语音输出」</li>
+                        <li>点击「语言」，选择并下载所需语音包</li>
+                        <li>重启Chrome浏览器后，重新打开本游戏</li>
+                    </ol>
+                </div>
+                <p class="mt-3 text-sm text-blue-600">注：若无粤语语音包，可先使用普通话完成游戏，后续再补充安装</p>
+            </div>
+            <button id="retry-btn" class="bg-primary text-white px-8 py-3 rounded-full scale-hover text-lg">
+                <i class="fa fa-refresh"></i> 重新選擇
+            </button>
+        </div>
+        
+        <!-- 遊戲容器 -->
+        <div id="game-container" class="hidden bg-white rounded-xl shadow-md p-8 mb-6 relative">
+            <!-- 导航按钮 -->
+            <button id="prev-word-btn" class="absolute bottom-6 left-6 bg-gray-200 text-gray-800 px-5 py-3 rounded-full scale-hover text-lg flex items-center">
+                <i class="fa fa-arrow-left mr-2"></i> 上一个词
+            </button>
+            <button id="next-word-btn" class="absolute bottom-6 right-6 bg-gray-200 text-gray-800 px-5 py-3 rounded-full scale-hover text-lg flex items-center">
+                下一个词 <i class="fa fa-arrow-right ml-2"></i>
+            </button>
+            
+            <!-- 选择题部分 -->
+            <div class="mb-10 text-center">
+                <div id="question-type" class="text-accent font-bold mb-3 text-xl">選擇正確的中文意思</div>
+                <div id="question" class="text-3xl md:text-4xl font-bold text-primary mb-6 bounce-subtle"></div>
+                
+                <div class="flex justify-center gap-4 mb-4">
+                    <button id="mandarin-btn" class="pronunciation-btn bg-light px-4 py-2 rounded-full text-base">
+                        <i class="fa fa-volume-up"></i> 普通話
+                    </button>
+                    <button id="cantonese-btn" class="pronunciation-btn bg-light px-4 py-2 rounded-full text-base active">
+                        <i class="fa fa-volume-up"></i> 粵語
+                    </button>
+                </div>
+                
+                <button id="read-again" class="text-gray-500 hover:text-primary transition-colors text-lg">
+                    <i class="fa fa-refresh"></i> 再讀一遍
+                </button>
+                <!-- 语音不可用时提示 -->
+                <p id="speech-unavailable" class="hidden text-sm text-gray-500 mt-2">
+                    <i class="fa fa-info-circle"></i> 浏览器不支持语音合成，可手动查看文字学习
+                </p>
+            </div>
+            
+            <!-- 选择题选项 -->
+            <div id="options" class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12"></div>
+            
+            <!-- 单词拼写练习模块 -->
+            <div class="border-t-2 border-primary/20 pt-8 mt-8">
+                <div class="text-center mb-6">
+                    <h3 class="text-2xl font-bold text-primary mb-2">單詞拼寫練習</h3>
+                    <p class="text-gray-600">根據中文意思拼寫出正確的英文單詞</p>
+                </div>
+                
+                <div class="text-center mb-6">
+                    <p class="text-xl text-gray-700 mb-4" id="spelling-prompt">請拼寫出 "apple" 的英文單詞</p>
+                    
+                    <!-- 拼写输入区域 -->
+                    <div id="spelling-container" class="mb-6 flex justify-center items-center flex-wrap"></div>
+                    
+                    <!-- 提示按钮：按住显示答案，放开隐藏 -->
+                    <div class="mt-4">
+                        <button 
+                            id="hint-btn" 
+                            class="bg-accent text-white px-6 py-3 rounded-full scale-hover text-lg flex items-center justify-center mx-auto"
+                            onmousedown="showSpellingHint()"
+                            onmouseup="hideSpellingHint()"
+                            onmouseleave="hideSpellingHint()"
+                            ontouchstart="showSpellingHint()"
+                            ontouchend="hideSpellingHint()"
+                        >
+                            <i class="fa fa-lightbulb-o mr-2"></i> 按住查看提示
+                        </button>
+                        <p id="spelling-hint" class="hidden mt-3 text-primary font-bold text-xl"></p>
+                    </div>
+                    
+                    <!-- 拼写检查按钮 -->
+                    <button id="check-spelling-btn" class="mt-6 bg-secondary text-white px-8 py-3 rounded-full scale-hover text-lg">
+                        <i class="fa fa-check"></i> 檢查拼寫
+                    </button>
+                    
+                    <!-- 拼写结果反馈 -->
+                    <p id="spelling-feedback" class="mt-4 text-lg font-bold hidden"></p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 關卡選擇彈窗 -->
+        <div id="level-selection-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-20">
+            <div class="bg-white rounded-xl p-8 max-w-2xl w-full">
+                <h2 class="text-3xl font-bold text-primary mb-6 text-center">自由選擇關卡</h2>
+                <p class="text-gray-500 mb-6 text-center text-lg">可直接進入任意關卡答題</p>
+                <div class="grid grid-cols-5 gap-4 mb-8"></div>
+                <button id="close-level-modal" class="bg-gray-200 text-gray-800 px-8 py-3 rounded-full scale-hover w-full text-lg">關閉</button>
+            </div>
+        </div>
+        
+        <!-- 關卡完成 -->
+        <div id="level-complete" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-10">
+            <div class="bg-white rounded-xl p-10 max-w-2xl w-full text-center">
+                <i class="fa fa-trophy text-accent text-7xl mb-6"></i>
+                <h2 class="text-3xl font-bold mb-3">恭喜完成關卡 <span id="completed-level"></span>！</h2>
+                <p class="text-gray-600 mb-8 text-lg">可以選擇其他關卡繼續挑戰哦～</p>
+                <div class="flex gap-4 justify-center">
+                    <button id="next-level-btn" class="bg-primary text-white px-8 py-3 rounded-full scale-hover text-lg">
+                        下一關 <i class="fa fa-arrow-right"></i>
+                    </button>
+                    <button id="choose-other-level-btn" class="bg-accent text-white px-8 py-3 rounded-full scale-hover text-lg">
+                        選擇其他關卡 <i class="fa fa-th"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 遊戲完成 -->
+        <div id="game-complete" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-10">
+            <div class="bg-white rounded-xl p-10 max-w-2xl w-full text-center">
+                <i class="fa fa-star text-accent text-7xl mb-6"></i>
+                <h2 class="text-3xl font-bold mb-3">恭喜你完成所有關卡！</h2>
+                <p class="text-gray-600 mb-8 text-lg">你真是個單詞小英雄！可以重新選擇詞庫繼續學習～</p>
+                <button id="restart-btn" class="bg-primary text-white px-8 py-3 rounded-full scale-hover text-lg">
+                    重新選擇詞庫 <i class="fa fa-refresh"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 遊戲核心狀態管理
+        const gameState = {
+            vocabularyList: [],
+            levels: [],
+            currentLevel: 0,
+            currentQuestion: 0,
+            currentWord: null,
+            questionType: 'wordToMeaning',
+            isAnswering: false,
+            completedLevels: [],
+            chinesePronunciation: 'cantonese',
+            activeTimers: [], // 統一管理定時器，防止內存洩漏
+            speechSupported: true, // 标记浏览器是否支持语音合成
+            voiceCheckCompleted: false, // 标记语音包检查是否完成
+            // 拼写练习状态
+            spellingInput: [], // 存储用户输入的拼写字符
+            spellingCompleted: false, // 标记当前单词的拼写是否已完成
+            inputProcessing: false // 用于防抖处理
+        };
+
+        // 工具函數：定時器管理
+        const timerUtils = {
+            clearAll: () => {
+                gameState.activeTimers.forEach(timer => clearTimeout(timer));
+                gameState.activeTimers = [];
+            },
+            setTimeout: (callback, delay) => {
+                const timer = setTimeout(() => {
+                    callback();
+                    // 執行後自動移除
+                    gameState.activeTimers = gameState.activeTimers.filter(t => t !== timer);
+                }, delay);
+                gameState.activeTimers.push(timer);
+                return timer;
+            }
+        };
+
+        // DOM元素緩存
+        const elements = {
+            // 反饋元素
+            likeIcon: document.getElementById('like-icon'),
+            
+            // 頁面容器
+            librarySelection: document.getElementById('library-selection'),
+            loading: document.getElementById('loading'),
+            error: document.getElementById('error'),
+            gameContainer: document.getElementById('game-container'),
+            modals: {
+                levelSelection: document.getElementById('level-selection-modal'),
+                levelComplete: document.getElementById('level-complete'),
+                gameComplete: document.getElementById('game-complete')
+            },
+            
+            // 顯示文字
+            status: {
+                currentLevel: document.getElementById('current-level'),
+                currentProgress: document.getElementById('current-progress'),
+                progressBar: document.getElementById('progress-bar'),
+                errorMessage: document.getElementById('error-message'),
+                errorDetails: document.getElementById('error-details'),
+                jsonTips: document.getElementById('json-tips'),
+                voiceTips: document.getElementById('voice-tips'),
+                speechUnavailable: document.getElementById('speech-unavailable'),
+                completedLevel: document.getElementById('completed-level'),
+                questionType: document.getElementById('question-type'),
+                question: document.getElementById('question'),
+                fileName: document.getElementById('file-name'),
+                // 拼写练习元素
+                spellingPrompt: document.getElementById('spelling-prompt'),
+                spellingContainer: document.getElementById('spelling-container'),
+                spellingHint: document.getElementById('spelling-hint'),
+                spellingFeedback: document.getElementById('spelling-feedback')
+            },
+            
+            // 按鈕元素
+            buttons: {
+                fileUpload: document.getElementById('file-upload'),
+                loadLocal: document.getElementById('load-local-btn'),
+                retry: document.getElementById('retry-btn'),
+                nextLevel: document.getElementById('next-level-btn'),
+                chooseOtherLevel: document.getElementById('choose-other-level-btn'),
+                restart: document.getElementById('restart-btn'),
+                readAgain: document.getElementById('read-again'),
+                selectLevel: document.getElementById('select-level-btn'),
+                closeLevelModal: document.getElementById('close-level-modal'),
+                prevWord: document.getElementById('prev-word-btn'),
+                nextWord: document.getElementById('next-word-btn'),
+                pronunciation: {
+                    mandarin: document.getElementById('mandarin-btn'),
+                    cantonese: document.getElementById('cantonese-btn')
+                },
+                // 拼写练习按钮
+                checkSpelling: document.getElementById('check-spelling-btn'),
+                hint: document.getElementById('hint-btn')
+            },
+            
+            // 遊戲元素
+            game: {
+                options: document.getElementById('options'),
+                levelGrid: document.querySelector('#level-selection-modal .grid')
+            }
+        };
+
+        // 语音合成工具
+        const speechUtils = {
+            voices: [],
+            voicesLoaded: false,
+            voiceTipShown: false,
+
+            init: () => {
+                gameState.speechSupported = 'speechSynthesis' in window;
+                if (!gameState.speechSupported) {
+                    gameState.voiceCheckCompleted = true;
+                    elements.status.speechUnavailable.classList.remove('hidden');
+                    console.log('[语音合成] 浏览器不支持SpeechSynthesis API');
+                    return;
+                }
+
+                const fetchVoices = () => {
+                    const newVoices = window.speechSynthesis.getVoices();
+                    if (newVoices.length !== speechUtils.voices.length) {
+                        speechUtils.voices = newVoices;
+                        speechUtils.voicesLoaded = newVoices.length > 0;
+                        console.log('[语音合成] 获取到语音包数量：', newVoices.length);
+                        
+                        if (speechUtils.voicesLoaded) {
+                            gameState.voiceCheckCompleted = true;
+                        }
+                    }
+                };
+
+                fetchVoices();
+                window.speechSynthesis.onvoiceschanged = fetchVoices;
+
+                timerUtils.setTimeout(() => {
+                    if (!speechUtils.voicesLoaded) {
+                        speechUtils.voicesLoaded = true;
+                        gameState.voiceCheckCompleted = true;
+                        console.log('[语音合成] 语音包加载超时，使用兜底逻辑');
+                        speechUtils.showVoiceMissingTip();
+                    }
+                }, 5000);
+            },
+
+            isSupported: () => gameState.speechSupported,
+
+            getCantoneseVoice: () => {
+                let cantoneseVoice = speechUtils.voices.find(voice => 
+                    voice.lang === 'zh-HK' || voice.lang === 'zh-hk' || 
+                    voice.lang === 'zh-CN-yue'
+                );
+
+                if (!cantoneseVoice) {
+                    cantoneseVoice = speechUtils.voices.find(voice => 
+                        voice.name.toLowerCase().includes('cantonese') || 
+                        voice.name.includes('粤语') || 
+                        voice.name.includes('廣東話')
+                    );
+                }
+
+                if (!cantoneseVoice) {
+                    cantoneseVoice = speechUtils.getMandarinVoice();
+                    if (!speechUtils.voiceTipShown) {
+                        speechUtils.showVoiceMissingTip('粤语');
+                    }
+                }
+
+                return cantoneseVoice;
+            },
+
+            getMandarinVoice: () => {
+                return speechUtils.voices.find(voice => 
+                    voice.lang === 'zh-CN' || voice.lang === 'zh-MO' || 
+                    voice.lang === 'zh-TW' || voice.lang.startsWith('zh-')
+                );
+            },
+
+            getEnglishVoice: () => {
+                const preferredLangs = ['en-US', 'en-GB', 'en-AU', 'en-CA', 'en-NZ'];
+                for (const lang of preferredLangs) {
+                    const voice = speechUtils.voices.find(v => v.lang === lang);
+                    if (voice) return voice;
+                }
+
+                const englishVoice = speechUtils.voices.find(voice => 
+                    voice.lang.startsWith('en-')
+                );
+
+                if (!englishVoice && !speechUtils.voiceTipShown) {
+                    speechUtils.showVoiceMissingTip('英文');
+                }
+
+                return englishVoice;
+            },
+
+            showVoiceMissingTip: (missingType = '') => {
+                if (speechUtils.voiceTipShown) return;
+                speechUtils.voiceTipShown = true;
+
+                elements.status.speechUnavailable.classList.remove('hidden');
+                if (missingType) {
+                    elements.status.speechUnavailable.innerHTML = 
+                        ` <i class="fa fa-info-circle"></i> 缺少${missingType}语音包，可参考错误提示安装，或继续使用文字学习`;
+                }
+
+                if (!elements.error.classList.contains('hidden')) {
+                    elements.status.voiceTips.classList.remove('hidden');
+                }
+
+                console.log(`[语音合成] 缺少${missingType || '必要'}语音包，已显示安装提示`);
+            },
+
+            readText: async (text, times = 1) => {
+                if (!speechUtils.isSupported()) {
+                    return false;
+                }
+
+                let waitCount = 0;
+                while (!speechUtils.voicesLoaded && waitCount < 50) {
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    waitCount++;
+                }
+
+                const isEnglish = /[a-zA-Z]/.test(text.trim());
+                let targetVoice;
+                if (isEnglish) {
+                    targetVoice = speechUtils.getEnglishVoice();
+                } else {
+                    targetVoice = gameState.chinesePronunciation === 'mandarin' 
+                        ? speechUtils.getMandarinVoice() 
+                        : speechUtils.getCantoneseVoice();
+                }
+
+                if (!targetVoice) {
+                    speechUtils.showVoiceMissingTip();
+                    return false;
+                }
+
+                const speakOnce = async () => {
+                    return new Promise(resolve => {
+                        try {
+                            window.speechSynthesis.cancel();
+
+                            const utterance = new SpeechSynthesisUtterance(text);
+                            utterance.voice = targetVoice;
+                            utterance.lang = targetVoice.lang;
+                            utterance.rate = 0.9;
+                            utterance.pitch = 1.1;
+                            utterance.volume = 1;
+
+                            utterance.onend = () => {
+                                console.log('[语音合成] 朗读完成：', text);
+                                resolve(true);
+                            };
+                            utterance.onerror = (error) => {
+                                console.error('[语音合成] 朗读失败：', error);
+                                resolve(false);
+                            };
+
+                            window.speechSynthesis.speak(utterance);
+                        } catch (e) {
+                            console.error('[语音合成] 执行异常：', e);
+                            resolve(false);
+                        }
+                    });
+                };
+
+                for (let i = 0; i < times; i++) {
+                    const success = await speakOnce();
+                    if (!success) break;
+                    if (i < times - 1) {
+                        await new Promise(resolve => timerUtils.setTimeout(resolve, 500));
+                    }
+                }
+
+                return true;
+            }
+        };
+
+        // 視覺反饋工具
+        const feedbackUtils = {
+            showLike: () => {
+                elements.likeIcon.classList.remove('like-animation');
+                void elements.likeIcon.offsetWidth;
+                elements.likeIcon.classList.add('like-animation');
+                
+                timerUtils.setTimeout(() => {
+                    elements.likeIcon.classList.remove('like-animation');
+                }, 1500);
+            },
+            
+            show: (el) => el && el.classList.remove('hidden'),
+            hide: (el) => el && el.classList.add('hidden')
+        };
+
+        // 事件監聽初始化
+        function initEventListeners() {
+            // 1. 文件上傳相關
+            elements.buttons.fileUpload.addEventListener('change', handleFileSelection);
+            elements.buttons.loadLocal.addEventListener('click', loadLocalVocabulary);
+            elements.buttons.retry.addEventListener('click', resetToFileSelection);
+            
+            // 2. 遊戲流程控制
+            elements.buttons.nextLevel.addEventListener('click', () => {
+                feedbackUtils.hide(elements.modals.levelComplete);
+                gameState.currentLevel = (gameState.currentLevel + 1) % gameState.levels.length;
+                gameState.currentQuestion = 0;
+                updateLevelDisplay();
+                loadNextQuestion();
+            });
+            elements.buttons.chooseOtherLevel.addEventListener('click', () => {
+                feedbackUtils.hide(elements.modals.levelComplete);
+                openLevelSelection();
+            });
+            elements.buttons.restart.addEventListener('click', () => {
+                feedbackUtils.hide(elements.modals.gameComplete);
+                resetToFileSelection();
+            });
+            
+            // 3. 朗讀功能
+            elements.buttons.readAgain.addEventListener('click', async () => {
+                if (!gameState.speechSupported) {
+                    elements.status.speechUnavailable.classList.remove('hidden');
+                    return;
+                }
+                await readCurrentQuestion();
+            });
+            
+            // 4. 關卡選擇
+            elements.buttons.selectLevel.addEventListener('click', openLevelSelection);
+            elements.buttons.closeLevelModal.addEventListener('click', () => {
+                feedbackUtils.hide(elements.modals.levelSelection);
+            });
+            
+            // 5. 發音切換
+            elements.buttons.pronunciation.mandarin.addEventListener('click', () => {
+                setPronunciation('mandarin');
+            });
+            elements.buttons.pronunciation.cantonese.addEventListener('click', () => {
+                setPronunciation('cantonese');
+            });
+            
+            // 6. 防止重複提交
+            elements.buttons.loadLocal.addEventListener('click', function() {
+                this.disabled = true;
+                timerUtils.setTimeout(() => {
+                    if (!elements.gameContainer.classList.contains('hidden')) {
+                        this.disabled = false;
+                    }
+                }, 1000);
+            });
+            
+            // 拼写检查按钮事件
+            elements.buttons.checkSpelling.addEventListener('click', checkSpelling);
+            
+            // 7. 单词导航按钮
+            elements.buttons.prevWord.addEventListener('click', goToPreviousWord);
+            elements.buttons.nextWord.addEventListener('click', goToNextWord);
+            
+            // 8. 全局监听回车键，用于拼写检查
+            document.addEventListener('keydown', function(e) {
+                // 只有在游戏容器显示且拼写容器有输入框时才响应
+                if (e.key === 'Enter' && 
+                    !elements.gameContainer.classList.contains('hidden') &&
+                    elements.status.spellingContainer.querySelector('input')) {
+                    e.preventDefault();
+                    checkSpelling();
+                }
+            });
+        }
+
+        // 上一个单词
+        function goToPreviousWord() {
+            if (gameState.currentQuestion > 0) {
+                timerUtils.clearAll();
+                gameState.currentQuestion--;
+                loadNextQuestion();
+            }
+        }
+
+        // 下一个单词
+        function goToNextWord() {
+            timerUtils.clearAll();
+            gameState.currentQuestion++;
+            loadNextQuestion();
+        }
+
+        // 显示拼写提示
+        function showSpellingHint() {
+            if (gameState.currentWord && !gameState.spellingCompleted) {
+                elements.status.spellingHint.textContent = gameState.currentWord.word;
+                elements.status.spellingHint.classList.remove('hidden');
+            }
+        }
+
+        // 隐藏拼写提示
+        function hideSpellingHint() {
+            elements.status.spellingHint.classList.add('hidden');
+        }
+
+        // 检查拼写是否正确（优化版）
+        function checkSpelling() {
+            if (!gameState.currentWord || gameState.spellingCompleted) return;
+            
+            // 获取用户输入的拼写并进行严格清洗
+            let userSpelling = gameState.spellingInput.join('')
+                .replace(/[^a-zA-Z]/g, '') // 移除所有非字母字符
+                .trim(); // 去除首尾空白
+            
+            // 正确单词处理（统一格式）
+            const correctWord = gameState.currentWord.word
+                .replace(/[^a-zA-Z]/g, '') // 确保正确单词也清除非字母字符
+                .toLowerCase();
+            
+            // 调试信息（生产环境可移除）
+            console.log('拼写检查:', {
+                userInput: userSpelling,
+                userInputRaw: gameState.spellingInput.join(''),
+                correctWord: correctWord,
+                lengthMatch: userSpelling.length === correctWord.length
+            });
+            
+            // 先检查长度是否匹配（防止部分输入或多余字符）
+            if (userSpelling.length !== correctWord.length) {
+                showSpellingFeedback(false, `输入长度不符！正确长度为 ${correctWord.length} 个字母`);
+                return;
+            }
+            
+            // 不区分大小写比较
+            const isCorrect = userSpelling.toLowerCase() === correctWord;
+            
+            showSpellingFeedback(isCorrect);
+        }
+
+        // 显示拼写反馈（拆分独立函数，便于维护）
+        function showSpellingFeedback(isCorrect, customMessage = '') {
+            let feedbackText;
+            
+            if (customMessage) {
+                feedbackText = customMessage;
+            } else {
+                feedbackText = isCorrect 
+                    ? `太棒了！正确拼写是：${gameState.currentWord.word}` 
+                    : `再试一次！正确拼写是：${gameState.currentWord.word}`;
+            }
+            
+            elements.status.spellingFeedback.textContent = feedbackText;
+            elements.status.spellingFeedback.className = `mt-4 text-lg font-bold ${
+                isCorrect ? 'text-secondary' : 'text-danger'
+            }`;
+            elements.status.spellingFeedback.classList.remove('hidden');
+            
+            if (isCorrect) {
+                gameState.spellingCompleted = true;
+                feedbackUtils.showLike();
+                
+                // 朗读正确单词
+                if (gameState.speechSupported) {
+                    speechUtils.readText(gameState.currentWord.word, 2);
+                }
+                
+                // 5秒后自动进入下一题
+                timerUtils.setTimeout(() => {
+                    gameState.currentQuestion++;
+                    loadNextQuestion();
+                }, 5000);
+            } else {
+                // 错误时朗读正确单词
+                if (gameState.speechSupported) {
+                    speechUtils.readText(gameState.currentWord.word, 2);
+                }
+            }
+        }
+
+        // 创建拼写输入框（优化版）
+        function createSpellingInputs(word) {
+            if (!word) return;
+            
+            // 清洗正确单词，确保没有特殊字符
+            const cleanWord = word.word.replace(/[^a-zA-Z]/g, '');
+            
+            // 重置拼写状态（关键优化：确保输入数组长度与单词长度严格一致）
+            gameState.spellingInput = new Array(cleanWord.length).fill('');
+            gameState.spellingCompleted = false;
+            gameState.inputProcessing = false;
+            elements.status.spellingContainer.innerHTML = '';
+            elements.status.spellingFeedback.classList.add('hidden');
+            
+            // 更新提示文本（显示清洗后的单词长度）
+            elements.status.spellingPrompt.textContent = `請根據意思拼寫出單詞（共 ${cleanWord.length} 個字母）：${word.meaning}`;
+            elements.status.spellingHint.textContent = word.word;
+            
+            // 创建输入框（数量与清洗后的单词长度严格匹配）
+            for (let i = 0; i < cleanWord.length; i++) {
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.maxLength = 1;
+                input.className = 'letter-input';
+                input.dataset.index = i;
+                input.style.textTransform = 'none';
+                input.autocapitalize = 'none';
+                input.inputMode = 'text';
+                
+                // 输入事件处理（增强版）
+                input.addEventListener('input', function(e) {
+                    if (gameState.inputProcessing || gameState.spellingCompleted) {
+                        return;
+                    }
+                    
+                    gameState.inputProcessing = true;
+                    
+                    // 只保留字母字符
+                    let value = (e.target.value || '').substring(0, 1)
+                        .replace(/[^a-zA-Z]/g, ''); // 过滤非字母字符
+                    
+                    gameState.spellingInput[i] = value;
+                    e.target.value = value;
+                    
+                    // 延迟重置处理状态
+                    setTimeout(() => {
+                        gameState.inputProcessing = false;
+                    }, 100);
+                    
+                    // 自动跳到下一个输入框
+                    if (value && i < cleanWord.length - 1) {
+                        const nextInput = elements.status.spellingContainer.querySelector(`[data-index="${i + 1}"]`);
+                        if (nextInput) {
+                            setTimeout(() => nextInput.focus(), 50);
+                        }
+                    }
+                });
+                
+                // 按键事件处理（增强版）
+                input.addEventListener('keydown', function(e) {
+                    // 回车键直接触发检查
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        checkSpelling();
+                        return;
+                    }
+                    
+                    if (['Backspace', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+                        e.preventDefault();
+                    }
+                    
+                    if (e.key.length === 1 && e.key.match(/[a-zA-Z]/i) && this.value) {
+                        e.preventDefault();
+                        return;
+                    }
+                    
+                    if (e.key === 'Backspace') {
+                        if (!this.value && i > 0) {
+                            const prevInput = elements.status.spellingContainer.querySelector(`[data-index="${i - 1}"]`);
+                            if (prevInput) {
+                                prevInput.focus();
+                                prevInput.value = '';
+                                gameState.spellingInput[i - 1] = '';
+                            }
+                        } else if (this.value) {
+                            this.value = '';
+                            gameState.spellingInput[i] = '';
+                        }
+                    } else if (e.key === 'ArrowRight' && i < cleanWord.length - 1) {
+                        const nextInput = elements.status.spellingContainer.querySelector(`[data-index="${i + 1}"]`);
+                        if (nextInput) nextInput.focus();
+                    } else if (e.key === 'ArrowLeft' && i > 0) {
+                        const prevInput = elements.status.spellingContainer.querySelector(`[data-index="${i - 1}"]`);
+                        if (prevInput) prevInput.focus();
+                    }
+                });
+                
+                elements.status.spellingContainer.appendChild(input);
+            }
+            
+            // 聚焦第一个输入框
+            const firstInput = elements.status.spellingContainer.querySelector('[data-index="0"]');
+            if (firstInput) {
+                setTimeout(() => firstInput.focus(), 100);
+            }
+        }
+
+        // 發音設置
+        function setPronunciation(type) {
+            gameState.chinesePronunciation = type;
+            elements.buttons.pronunciation.mandarin.classList.toggle('active', type === 'mandarin');
+            elements.buttons.pronunciation.cantonese.classList.toggle('active', type === 'cantonese');
+            if (gameState.currentWord && gameState.speechSupported) {
+                readCurrentQuestion();
+            }
+        }
+
+        // 文件選擇處理
+        function handleFileSelection(event) {
+            const file = event.target.files[0];
+            if (!file) {
+                elements.status.fileName.textContent = '未選擇文件（請選擇擴展名為.json的文件）';
+                elements.status.fileName.classList.remove('text-danger');
+                elements.buttons.loadLocal.disabled = true;
+                return;
+            }
+
+            const ext = file.name.split('.').pop().toLowerCase();
+            const isJson = ext === 'json' && ['application/json', 'application/x-json', ''].includes(file.type);
+            
+            if (isJson) {
+                elements.status.fileName.textContent = `已選擇: ${file.name}`;
+                elements.status.fileName.classList.remove('text-danger');
+                elements.buttons.loadLocal.disabled = false;
+            } else {
+                elements.status.fileName.textContent = '錯誤：請選擇有效的JSON格式文件（.json）';
+                elements.status.fileName.classList.add('text-danger');
+                elements.buttons.loadLocal.disabled = true;
+            }
+        }
+
+        // 加載本地詞庫
+        function loadLocalVocabulary() {
+            const file = elements.buttons.fileUpload.files[0];
+            if (!file) return showError('未選擇文件', '請先選擇一個詞庫文件');
+            
+            feedbackUtils.show(elements.loading);
+            feedbackUtils.hide(elements.librarySelection);
+            feedbackUtils.hide(elements.error);
+            feedbackUtils.hide(elements.buttons.selectLevel);
+            elements.status.progressBar.style.width = '0%';
+            
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    elements.status.progressBar.style.width = '30%';
+                    const content = e.target.result?.trim();
+                    
+                    if (!content) throw new Error('文件內容為空');
+                    if (!validateJsonStructure(content)) throw new Error(validateJsonStructure.error);
+                    
+                    elements.status.progressBar.style.width = '60%';
+                    const data = JSON.parse(content);
+                    
+                    if (!Array.isArray(data)) throw new Error('詞庫必須是一個數組格式：[{"word":"apple","meaning":"蘋果"},...]');
+                    if (data.length === 0) throw new Error('詞庫為空，請添加單詞後再試');
+                    
+                    const invalidItems = validateVocabularyItems(data);
+                    if (invalidItems.length) throw new Error(`發現${invalidItems.length}個無效條目:\n${invalidItems.join('\n')}`);
+                    
+                    gameState.vocabularyList = data;
+                    splitIntoLevels();
+                    elements.status.progressBar.style.width = '100%';
+                    
+                    await new Promise(resolve => timerUtils.setTimeout(resolve, 300));
+                    feedbackUtils.hide(elements.loading);
+                    
+                    if (gameState.speechSupported && !gameState.voiceCheckCompleted) {
+                        speechUtils.showVoiceMissingTip();
+                    }
+                    
+                    startGame();
+                    
+                } catch (error) {
+                    console.error('詞庫加載失敗:', error);
+                    const isVoiceError = error.message.includes('语音') || error.message.includes('Speech');
+                    showError('詞庫加載失敗', error.message, error.message.includes('JSON'), isVoiceError);
+                    feedbackUtils.hide(elements.loading);
+                }
+            };
+            
+            reader.onerror = () => {
+                showError('文件讀取失敗', `無法讀取文件: ${reader.error.message}`);
+                feedbackUtils.hide(elements.loading);
+            };
+            
+            try { reader.readAsText(file); } 
+            catch (e) {
+                showError('讀取文件失敗', e.message);
+                feedbackUtils.hide(elements.loading);
+            }
+        }
+
+        // JSON結構驗證
+        function validateJsonStructure(content) {
+            let openBrackets = 0, openBraces = 0, inString = false, lastChar = '';
+            
+            for (let i = 0; i < content.length; i++) {
+                const char = content[i];
+                
+                if (char === '"' && lastChar !== '\\') inString = !inString;
+                
+                if (!inString) {
+                    switch(char) {
+                        case '[': openBrackets++; break;
+                        case ']': openBrackets--; break;
+                        case '{': openBraces++; break;
+                        case '}': openBraces--; break;
+                    }
+                    
+                    if (openBrackets < 0 || openBraces < 0) {
+                        validateJsonStructure.error = `JSON格式錯誤：位置 ${i+1} 有不匹配的閉合符號`;
+                        return false;
+                    }
+                }
+                
+                lastChar = char;
+            }
+            
+            if (openBrackets !== 0 || openBraces !== 0) {
+                let msg = 'JSON格式不完整：';
+                if (openBrackets > 0) msg += ` 缺少 ${openBrackets} 個 ]`;
+                if (openBraces > 0) msg += ` 缺少 ${openBraces} 個 }`;
+                validateJsonStructure.error = msg;
+                return false;
+            }
+            
+            return true;
+        }
+
+        // 詞庫條目驗證
+        function validateVocabularyItems(data) {
+            const invalid = [];
+            data.forEach((item, index) => {
+                if (!item || typeof item !== 'object') {
+                    invalid.push(`第${index + 1}項: 不是有效的對象`);
+                    return;
+                }
+                
+                const word = item.word !== undefined ? String(item.word).trim() : '';
+                const meaning = item.meaning !== undefined ? String(item.meaning).trim() : '';
+                
+                if (!word) invalid.push(`第${index + 1}項: 缺少"word"字段（英文單詞）`);
+                if (!meaning) invalid.push(`第${index + 1}項: 缺少"meaning"字段（中文釋義）`);
+            });
+            return invalid;
+        }
+
+        // 顯示錯誤信息
+        function showError(title, details, showJsonTips = false, showVoiceTips = false) {
+            elements.status.errorMessage.textContent = title;
+            elements.status.errorDetails.textContent = details;
+            showJsonTips ? feedbackUtils.show(elements.status.jsonTips) : feedbackUtils.hide(elements.status.jsonTips);
+            showVoiceTips ? feedbackUtils.show(elements.status.voiceTips) : feedbackUtils.hide(elements.status.voiceTips);
+            feedbackUtils.show(elements.error);
+            feedbackUtils.show(elements.buttons.selectLevel);
+        }
+
+        // 重置到文件選擇
+        function resetToFileSelection() {
+            timerUtils.clearAll();
+            
+            const newInput = document.createElement('input');
+            newInput.id = 'file-upload';
+            newInput.type = 'file';
+            newInput.accept = '.json';
+            newInput.className = 'hidden';
+            newInput.addEventListener('change', handleFileSelection);
+            elements.buttons.fileUpload.parentNode.replaceChild(newInput, elements.buttons.fileUpload);
+            elements.buttons.fileUpload = newInput;
+            
+            elements.status.fileName.textContent = '未選擇文件（請選擇擴展名為.json的文件）';
+            elements.status.fileName.classList.remove('text-danger');
+            elements.buttons.loadLocal.disabled = true;
+            elements.status.progressBar.style.width = '0%';
+            speechUtils.voiceTipShown = false;
+            
+            feedbackUtils.hide(elements.error);
+            feedbackUtils.show(elements.librarySelection);
+        }
+
+        // 拆分關卡
+        function splitIntoLevels() {
+            const totalLevels = 10;
+            const wordsPerLevel = Math.ceil(gameState.vocabularyList.length / totalLevels);
+            gameState.levels = [];
+            
+            for (let i = 0; i < totalLevels; i++) {
+                const start = i * wordsPerLevel;
+                const end = Math.min(start + wordsPerLevel, gameState.vocabularyList.length);
+                let levelWords = gameState.vocabularyList.slice(start, end);
+                
+                if (levelWords.length === 0 && i < gameState.vocabularyList.length) {
+                    levelWords.push(gameState.vocabularyList[i % gameState.vocabularyList.length]);
+                }
+                
+                gameState.levels.push(levelWords);
+            }
+        }
+
+        // 開始遊戲
+        function startGame() {
+            gameState.currentLevel = 0;
+            gameState.currentQuestion = 0;
+            gameState.completedLevels = [];
+            
+            updateLevelDisplay();
+            generateLevelButtons();
+            feedbackUtils.show(elements.gameContainer);
+            feedbackUtils.show(elements.buttons.selectLevel);
+            
+            if (!gameState.speechSupported) {
+                elements.status.speechUnavailable.classList.remove('hidden');
+            }
+            
+            loadNextQuestion();
+        }
+
+        // 生成關卡按鈕
+        function generateLevelButtons() {
+            const levelGrid = elements.game.levelGrid;
+            levelGrid.innerHTML = '';
+            
+            gameState.levels.forEach((_, index) => {
+                const isCompleted = gameState.completedLevels.includes(index);
+                const button = document.createElement('button');
+                
+                button.className = `w-full py-4 rounded-lg font-bold text-xl transition-all ${
+                    isCompleted ? 'bg-secondary text-white scale-hover' : 'bg-primary text-white scale-hover'
+                }`;
+                button.innerHTML = isCompleted ? `${index + 1} <i class="fa fa-check"></i>` : `${index + 1}`;
+                
+                button.addEventListener('click', () => {
+                    timerUtils.clearAll();
+                    gameState.currentLevel = index;
+                    gameState.currentQuestion = 0;
+                    updateLevelDisplay();
+                    feedbackUtils.hide(elements.modals.levelSelection);
+                    loadNextQuestion();
+                });
+                
+                levelGrid.appendChild(button);
+            });
+        }
+
+        // 打開關卡選擇
+        function openLevelSelection() {
+            generateLevelButtons();
+            feedbackUtils.show(elements.modals.levelSelection);
+        }
+
+        // 加載下一題
+        function loadNextQuestion() {
+            timerUtils.clearAll();
+            const currentLevelWords = gameState.levels[gameState.currentLevel];
+            
+            if (!currentLevelWords?.length || gameState.currentQuestion >= currentLevelWords.length) {
+                completeLevel();
+                return;
+            }
+            
+            // 更新导航按钮状态
+            elements.buttons.prevWord.disabled = gameState.currentQuestion === 0;
+            elements.buttons.prevWord.classList.toggle('opacity-50', gameState.currentQuestion === 0);
+            elements.buttons.prevWord.classList.toggle('cursor-not-allowed', gameState.currentQuestion === 0);
+            
+            gameState.isAnswering = true;
+            gameState.currentWord = currentLevelWords[gameState.currentQuestion];
+            gameState.questionType = Math.random() > 0.5 ? 'wordToMeaning' : 'meaningToWord';
+            
+            if (gameState.questionType === 'wordToMeaning') {
+                elements.status.questionType.textContent = '選擇正確的中文意思';
+                elements.status.question.textContent = gameState.currentWord.word;
+                if (gameState.speechSupported) {
+                    const waitForVoiceCheck = async () => {
+                        let waitCount = 0;
+                        while (!gameState.voiceCheckCompleted && waitCount < 50) {
+                            await new Promise(resolve => setTimeout(resolve, 100));
+                            waitCount++;
+                        }
+                        await speechUtils.readText(gameState.currentWord.word, 1);
+                    };
+                    waitForVoiceCheck();
+                }
+            } else {
+                elements.status.questionType.textContent = '選擇正確的英文單詞';
+                elements.status.question.textContent = gameState.currentWord.meaning;
+                if (gameState.speechSupported) {
+                    const waitForVoiceCheck = async () => {
+                        let waitCount = 0;
+                        while (!gameState.voiceCheckCompleted && waitCount < 50) {
+                            await new Promise(resolve => setTimeout(resolve, 100));
+                            waitCount++;
+                        }
+                        await speechUtils.readText(gameState.currentWord.meaning, 1);
+                    };
+                    waitForVoiceCheck();
+                }
+            }
+            
+            // 初始化拼写练习
+            createSpellingInputs(gameState.currentWord);
+            
+            updateProgressDisplay();
+            generateOptions();
+        }
+
+        // 生成選項
+        function generateOptions() {
+            const optionsContainer = elements.game.options;
+            optionsContainer.innerHTML = '';
+            
+            const { currentWord, vocabularyList } = gameState;
+            if (!currentWord) return;
+            
+            const options = [currentWord];
+            while (options.length < 4 && options.length < vocabularyList.length) {
+                const randomIndex = Math.floor(Math.random() * vocabularyList.length);
+                const randomWord = vocabularyList[randomIndex];
+                if (!options.some(opt => opt.word === randomWord.word)) {
+                    options.push(randomWord);
+                }
+            }
+            
+            while (options.length < 4) {
+                const randomIndex = Math.floor(Math.random() * vocabularyList.length);
+                options.push(vocabularyList[randomIndex]);
+            }
+            
+            shuffleArray(options).forEach(option => {
+                const button = document.createElement('button');
+                button.className = 'bg-light hover:bg-primary/10 text-gray-800 p-6 rounded-lg text-left scale-hover transition-all text-lg';
+                button.textContent = gameState.questionType === 'wordToMeaning' 
+                    ? option.meaning 
+                    : option.word;
+                
+                button.addEventListener('click', () => {
+                    if (gameState.isAnswering) {
+                        checkAnswer(button, option);
+                    }
+                });
+                
+                optionsContainer.appendChild(button);
+            });
+        }
+
+        // 檢查答案
+        function checkAnswer(button, selectedOption) {
+            gameState.isAnswering = false;
+            const isCorrect = selectedOption.word === gameState.currentWord.word;
+            
+            button.classList.add(isCorrect ? 'correct-highlight' : 'wrong-highlight');
+            
+            if (isCorrect) {
+                feedbackUtils.showLike();
+                
+                timerUtils.setTimeout(() => {
+                    // 聚焦到拼写练习的第一个输入框
+                    const firstInput = elements.status.spellingContainer.querySelector('[data-index="0"]');
+                    if (firstInput) firstInput.focus();
+                }, 1000);
+            } else {
+                const correctAnswerText = gameState.questionType === 'wordToMeaning' 
+                    ? gameState.currentWord.meaning 
+                    : gameState.currentWord.word;
+                
+                const optionButtons = elements.game.options.querySelectorAll('button');
+                optionButtons.forEach(btn => {
+                    if (btn.textContent.trim() === correctAnswerText.trim()) {
+                        btn.classList.add('flash');
+                    }
+                });
+                
+                if (gameState.speechSupported) {
+                    const readCorrectAnswer = async () => {
+                        if (gameState.currentWord.word) await speechUtils.readText(gameState.currentWord.word);
+                        await new Promise(resolve => timerUtils.setTimeout(resolve, 800));
+                        if (gameState.currentWord.meaning) await speechUtils.readText(gameState.currentWord.meaning);
+                        await new Promise(resolve => timerUtils.setTimeout(resolve, 800));
+                    };
+                    
+                    readCorrectAnswer()
+                        .then(() => readCorrectAnswer())
+                        .then(() => readCorrectAnswer())
+                        .then(() => {
+                            // 聚焦到拼写练习
+                            const firstInput = elements.status.spellingContainer.querySelector('[data-index="0"]');
+                            if (firstInput) firstInput.focus();
+                        });
+                } else {
+                    timerUtils.setTimeout(() => {
+                        const firstInput = elements.status.spellingContainer.querySelector('[data-index="0"]');
+                        if (firstInput) firstInput.focus();
+                    }, 2000);
+                }
+            }
+        }
+
+        // 朗讀當前題目
+        async function readCurrentQuestion() {
+            if (!gameState.currentWord || !gameState.speechSupported) return;
+            
+            const textToRead = gameState.questionType === 'wordToMeaning' 
+                ? gameState.currentWord.word 
+                : gameState.currentWord.meaning;
+            
+            let waitCount = 0;
+            while (!gameState.voiceCheckCompleted && waitCount < 50) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+                waitCount++;
+            }
+            
+            await speechUtils.readText(textToRead, 1);
+        }
+
+        // 完成關卡
+        function completeLevel() {
+            if (!gameState.completedLevels.includes(gameState.currentLevel)) {
+                gameState.completedLevels.push(gameState.currentLevel);
+            }
+            
+            generateLevelButtons();
+            elements.status.completedLevel.textContent = gameState.currentLevel + 1;
+            feedbackUtils.show(elements.modals.levelComplete);
+            
+            if (gameState.completedLevels.length >= gameState.levels.length) {
+                timerUtils.setTimeout(() => {
+                    feedbackUtils.hide(elements.modals.levelComplete);
+                    feedbackUtils.show(elements.modals.gameComplete);
+                }, 2000);
+            }
+        }
+
+        // 更新關卡顯示
+        function updateLevelDisplay() {
+            elements.status.currentLevel.textContent = `${gameState.currentLevel + 1}/${gameState.levels.length}`;
+        }
+
+        // 更新進度顯示
+        function updateProgressDisplay() {
+            const total = gameState.levels[gameState.currentLevel].length;
+            elements.status.currentProgress.textContent = `${gameState.currentQuestion + 1}/${total}`;
+        }
+
+        // 工具函數：數組洗牌
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        // 初始化遊戲
+        window.addEventListener('DOMContentLoaded', () => {
+            try {
+                speechUtils.init();
+                initEventListeners();
+            } catch (error) {
+                console.error('遊戲初始化失敗:', error);
+                showError('初始化失敗', '遊戲加載過程中出現錯誤，請刷新頁面重試', false, true);
+            }
+        });
+
+        // 頁面關閉時清理資源
+        window.addEventListener('beforeunload', timerUtils.clearAll);
+    </script>
+</body>
+</html>
